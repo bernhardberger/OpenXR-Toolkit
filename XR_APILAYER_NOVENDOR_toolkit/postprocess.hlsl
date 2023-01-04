@@ -27,8 +27,9 @@ cbuffer config : register(b0) {
     float4 Params1;  // Contrast, Brightness, Exposure, Saturation (-1..+1 params)
     float4 Params2;  // ColorGainR, ColorGainG, ColorGainB (-1..+1 params)
     float4 Params3;  // Highlights, Shadows, Vibrance (0..1 params)
-    float4 Params4;  // ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (-1..+1 params)
-    float4 Params5;  // LensCenterX, LensCenterY, SlopeX, SlopeY
+    float4 Params4;  // ChromaticCorrectionRX, ChromaticCorrectionGX, ChromaticCorrectionBX (-1..+1 params)
+    float4 Params5;  // ChromaticCorrectionRY, ChromaticCorrectionGY, ChromaticCorrectionBY (-1..+1 params)
+    float4 Params6;  // LensCenterX, LensCenterY, SlopeX, SlopeY
 };
 
 SamplerState sourceSampler : register(s0);
@@ -194,22 +195,22 @@ float4 mainPassThrough(in float4 position : SV_POSITION, in float2 texcoord : TE
 #if 0 // Original PP shader
     float3 color = SAMPLE_TEXTURE(texcoord).rgb;
 #else
-    float2 lensCenter = Params5.xy;
-    float2 slope = Params5.zw;
+    float2 lensCenter = Params6.xy;
+    float2 slope = Params6.zw;
 
     float2 uvr;
     uvr.x = ((texcoord.x - lensCenter.x) * slope.x * Params4.r) + lensCenter.x;
-    uvr.y = ((texcoord.y - lensCenter.y) * slope.y * Params4.r) + lensCenter.y;
+    uvr.y = ((texcoord.y - lensCenter.y) * slope.y * Params5.r) + lensCenter.y;
     float r = SAMPLE_TEXTURE(uvr).r;
 
     float2 uvg;
     uvg.x = ((texcoord.x - lensCenter.x) * slope.x * Params4.g) + lensCenter.x;
-    uvg.y = ((texcoord.y - lensCenter.y) * slope.y * Params4.g) + lensCenter.y;
+    uvg.y = ((texcoord.y - lensCenter.y) * slope.y * Params5.g) + lensCenter.y;
     float g = SAMPLE_TEXTURE(uvg).g;
 
     float2 uvb;
     uvb.x = ((texcoord.x - lensCenter.x) * slope.x * Params4.b) + lensCenter.x;
-    uvb.y = ((texcoord.y - lensCenter.y) * slope.y * Params4.b) + lensCenter.y;
+    uvb.y = ((texcoord.y - lensCenter.y) * slope.y * Params5.b) + lensCenter.y;
     float b = SAMPLE_TEXTURE(uvb).b;
 
     float3 color = float3(r, g, b);

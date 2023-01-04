@@ -193,9 +193,12 @@ namespace toolkit {
         const std::string SettingTurboMode = "turbo";
         const std::string SettingTargetFrameRate = "target_rate";
         const std::string SettingTargetFrameRate2 = "target_rate2";
-        const std::string SettingPostChromaticCorrectionR = "post_ca_r";
-        const std::string SettingPostChromaticCorrectionG = "post_ca_g";
-        const std::string SettingPostChromaticCorrectionB = "post_ca_b";
+        const std::string SettingPostChromaticCorrectionRX = "post_ca_r_x";
+        const std::string SettingPostChromaticCorrectionGX = "post_ca_g_x";
+        const std::string SettingPostChromaticCorrectionBX = "post_ca_b_x";
+        const std::string SettingPostChromaticCorrectionRY = "post_ca_r_y";
+        const std::string SettingPostChromaticCorrectionGY = "post_ca_g_y";
+        const std::string SettingPostChromaticCorrectionBY = "post_ca_b_y";
         const std::string SettingPostChromaticCorrectionLensCenterX = "post_ca_lens_center_x";
         const std::string SettingPostChromaticCorrectionLensCenterY = "post_ca_lens_center_y";
         const std::string SettingPostChromaticCorrectionSlopeX = "post_ca_slope_x";

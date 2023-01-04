@@ -1758,32 +1758,59 @@ namespace {
                 {MenuIndent::NoIndent, "Chromatic correction:", MenuEntryType::Separator, BUTTON_OR_SEPARATOR});
             m_menuEntries.back().expert = true;
             m_menuEntries.push_back({MenuIndent::SubGroupIndent,
-                                     "Red",
+                                     "Red (X)",
                                      MenuEntryType::Slider,
-                                     SettingPostChromaticCorrectionR,
+                                     SettingPostChromaticCorrectionRX,
+                                     0,
+                                     20000,
+                                     MenuEntry::FmtDecimal<2>});            
+            m_menuEntries.back().acceleration = 5;
+            m_menuEntries.back().expert = true;
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Red (Y)",
+                                     MenuEntryType::Slider,
+                                     SettingPostChromaticCorrectionRY,
                                      0,
                                      20000,
                                      MenuEntry::FmtDecimal<2>});
             m_menuEntries.back().acceleration = 5;
             m_menuEntries.back().expert = true;
             m_menuEntries.push_back({MenuIndent::SubGroupIndent,
-                                     "Green",
+                                     "Blue (X)",
                                      MenuEntryType::Slider,
-                                     SettingPostChromaticCorrectionG,
+                                     SettingPostChromaticCorrectionBX,
+                                     0,
+                                     20000,
+                                     MenuEntry::FmtDecimal<2>});
+            m_menuEntries.back().expert = true;
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Blue (Y)",
+                                     MenuEntryType::Slider,
+                                     SettingPostChromaticCorrectionBY,
+                                     0,
+                                     20000,
+                                     MenuEntry::FmtDecimal<2>});
+            
+            m_menuEntries.back().acceleration = 5;
+            m_menuEntries.back().expert = true;
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Green (X)",
+                                     MenuEntryType::Slider,
+                                     SettingPostChromaticCorrectionGX,
                                      0,
                                      20000,
                                      MenuEntry::FmtDecimal<2>});
             m_menuEntries.back().acceleration = 5;
             m_menuEntries.back().expert = true;
             m_menuEntries.push_back({MenuIndent::SubGroupIndent,
-                                     "Blue",
+                                     "Green (Y)",
                                      MenuEntryType::Slider,
-                                     SettingPostChromaticCorrectionB,
+                                     SettingPostChromaticCorrectionGY,
                                      0,
                                      20000,
                                      MenuEntry::FmtDecimal<2>});
-            m_menuEntries.back().expert = true;
             m_menuEntries.back().acceleration = 5;
+            m_menuEntries.back().expert = true;
             m_menuEntries.push_back({MenuIndent::SubGroupIndent,
                                      "Lens center X (Left eye)",
                                      MenuEntryType::Slider,

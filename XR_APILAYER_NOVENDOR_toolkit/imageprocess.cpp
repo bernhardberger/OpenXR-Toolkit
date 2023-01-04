@@ -40,8 +40,9 @@ namespace {
         XrVector4f Params1; // Contrast, Brightness, Exposure, Saturation (-1..+1 params)
         XrVector4f Params2; // ColorGainR, ColorGainG, ColorGainB (-1..+1 params)
         XrVector4f Params3; // Highlights, Shadows, Vibrance (0..1 params)
-        XrVector4f Params4; // ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (-1..+1 params)
-        XrVector4f Params5; // LensCenterX, LensCenterY, SlopeX, SlopeY
+        XrVector4f Params4; // ChromaticCorrectionRX, ChromaticCorrectionGX, ChromaticCorrectionBX (-1..+1 params)
+        XrVector4f Params5; // ChromaticCorrectionRY, ChromaticCorrectionGY, ChromaticCorrectionBY (-1..+1 params)
+        XrVector4f Params6; // LensCenterX, LensCenterY, SlopeX, SlopeY
     };
 
     class ImageProcessor : public IImageProcessor {
@@ -81,7 +82,7 @@ namespace {
             memcpy(config, &m_config, sizeof(m_config));
             if (eye == utilities::Eye::Right) {
                 // Mirror LensCenterX.
-                config->Params5.x = 1.0f - config->Params5.x;
+                config->Params6.x = 1.0f - config->Params6.x;
             }
 
             // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
@@ -129,9 +130,12 @@ namespace {
                        m_configManager->hasChanged(SettingPostColorGainR) ||
                        m_configManager->hasChanged(SettingPostColorGainG) ||
                        m_configManager->hasChanged(SettingPostColorGainB) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionR) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionG) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionB) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionRX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionGX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionBX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionRY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionGY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionBY) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterX) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterY) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionSlopeX) ||
@@ -140,9 +144,12 @@ namespace {
                 return m_configManager->hasChanged(SettingPostColorGainR) ||
                        m_configManager->hasChanged(SettingPostColorGainG) ||
                        m_configManager->hasChanged(SettingPostColorGainB) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionR) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionG) ||
-                       m_configManager->hasChanged(SettingPostChromaticCorrectionB) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionRX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionGX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionBX) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionRY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionGY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionBY) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterX) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterY) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionSlopeX) ||
@@ -181,14 +188,19 @@ namespace {
                 const auto param = (XMLoadSInt4(&params[3]) + XMLoadSInt4(&preset[3])) * 0.0001f;
                 StoreXrVector4(&m_config.Params4, param);
             }
+            // [0..10000] -> [0..1]
+            {
+                const auto param = (XMLoadSInt4(&params[4]) + XMLoadSInt4(&preset[4])) * 0.0001f;
+                StoreXrVector4(&m_config.Params5, param);
+            }
             // [0..100] -> [0..1]
             {
-                const auto param = (XMLoadSInt4(&params[4]) + XMLoadSInt4(&preset[4])) * 0.01f;
-                StoreXrVector4(&m_config.Params5, param);
+                const auto param = (XMLoadSInt4(&params[5]) + XMLoadSInt4(&preset[5])) * 0.01f;
+                StoreXrVector4(&m_config.Params6, param);
             }
         }
 
-        static std::array<DirectX::XMINT4, 5> GetParams(const IConfigManager* configManager, size_t index) {
+        static std::array<DirectX::XMINT4, 6> GetParams(const IConfigManager* configManager, size_t index) {
             using namespace DirectX;
             if (configManager) {
                 static const char* lut[] = {"", "_u1", "_u2", "_u3", "_u4"}; // placeholder up to 4
@@ -208,9 +220,13 @@ namespace {
                                configManager->getValue(SettingPostShadows + suffix),
                                configManager->getValue(SettingPostVibrance + suffix),
                                0),
-                        XMINT4(configManager->getValue(SettingPostChromaticCorrectionR + suffix),
-                               configManager->getValue(SettingPostChromaticCorrectionG + suffix),
-                               configManager->getValue(SettingPostChromaticCorrectionB + suffix),
+                        XMINT4(configManager->getValue(SettingPostChromaticCorrectionRX + suffix),
+                               configManager->getValue(SettingPostChromaticCorrectionGX + suffix),
+                               configManager->getValue(SettingPostChromaticCorrectionBX + suffix),
+                               0),
+                        XMINT4(configManager->getValue(SettingPostChromaticCorrectionRY + suffix),
+                               configManager->getValue(SettingPostChromaticCorrectionGY + suffix),
+                               configManager->getValue(SettingPostChromaticCorrectionBY + suffix),
                                0),
                         XMINT4(configManager->getValue(SettingPostChromaticCorrectionLensCenterX + suffix),
                                configManager->getValue(SettingPostChromaticCorrectionLensCenterY + suffix),
@@ -220,6 +236,7 @@ namespace {
             return {XMINT4(500, 500, 500, 500),
                     XMINT4(500, 500, 500, 0),
                     XMINT4(1000, 0, 0, 0),
+                    XMINT4(5000, 5000, 5000, 0),
                     XMINT4(5000, 5000, 5000, 0),
                     XMINT4(50, 50, 100, 100)};
         }
@@ -250,7 +267,7 @@ namespace {
 
         const std::shared_ptr<IConfigManager> m_configManager;
         const std::shared_ptr<IDevice> m_device;
-        const std::array<DirectX::XMINT4, 5> m_userParams;
+        const std::array<DirectX::XMINT4, 6> m_userParams;
 
         std::shared_ptr<IQuadShader> m_shaders[2]; // off, on
         std::shared_ptr<IShaderBuffer> m_cbParams;
