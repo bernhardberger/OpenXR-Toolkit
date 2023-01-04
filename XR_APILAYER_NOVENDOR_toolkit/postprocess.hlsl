@@ -30,6 +30,7 @@ cbuffer config : register(b0) {
     float4 Params4; // X axis: ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (0.9..1.1 params)
     float4 Params5; // Y axis: ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (0.9..1.1 params)
     float4 Params6; // LensCenterX, LensCenterY (-1..+1 params), ShowCenter (0-1)
+    float4 Params7; // LensAlpha (0...1)
 };
 
 SamplerState sourceSampler : register(s0);
@@ -157,6 +158,34 @@ float3 AdjustHighlightsShadows(float3 color, float2 amount) {
   return (color/luma) * (h + s - luma);
 }
 
+// glsl subs
+float2 greaterThanEqual(float2 a, float2 b)
+{
+	return float2(
+		a.x >= b.x,
+		a.y >= b.y
+		//a.z >= b.z,
+		//a.w >= b.w
+	);
+}
+
+float2 lessThanEqual(float2 a, float2 b)
+{
+	return float2(
+		a.x <= b.x,
+		a.y <= b.y
+		//a.z <= b.z,
+		//a.w <= b.w
+	);
+}
+
+float all(float2 a)
+{
+	return float(a.x == true && a.y == true);
+}
+
+
+
 float4 mainPostProcess(in float4 position : SV_POSITION, in float2 texcoord : TEXCOORD0) : SV_TARGET {
   float3 color = SAMPLE_TEXTURE(texcoord).rgb;
 
@@ -191,11 +220,18 @@ float4 mainPostProcess(in float4 position : SV_POSITION, in float2 texcoord : TE
   return float4(saturate(color), 1.0);
 }
 
+//#version 300 es
+//in highp vec2 texFrg;
+//out highp vec4 frgCol;
+//uniform highp sampler2D texSampler;
+
 float4 mainPassThrough(in float4 position : SV_POSITION, in float2 texcoord : TEXCOORD0) : SV_TARGET {
 #if 0 // Original PP shader
     float3 color = SAMPLE_TEXTURE(texcoord).rgb;
-#else
-    float3 colorOffsetX = Params4.rgb;
+    /**
+#if 0
+    
+	float3 colorOffsetX = Params4.rgb;
     float3 colorOffsetY = Params5.rgb;
     float2 lensCenter = Params6.xy;
     bool showCenter = Params6.z > 0;
@@ -222,7 +258,55 @@ float4 mainPassThrough(in float4 position : SV_POSITION, in float2 texcoord : TE
         r = g = b = 1.0f;
     }
 
-    float3 color = float3(r, g, b);
+    float3 color = float3(r, g, b);  
+#endif // 0
+**/
+#else
+    // ported to hlsl from: https://blog.imaginationtech.com/speeding-up-gpu-barrel-distortion-correction-in-mobile-vr/
+    //float2 texFrg = texcoord;
+    //Texture2D texSampler;
+
+    //float4 col = { 0.0, 0.0, 0.0, 1.0 }; /* base colour */
+    //float3 color = SAMPLE_TEXTURE(texcoord).rgb;
+    //float2 foo = 0.0;
+    //float2 bar = 1.0;
+
+    /**
+     if (all(greaterThanEqual(texcoord, float2(0.0, 0.0))) &&
+         all(lessThanEqual(texcoord, float2(0.0, 0.0))))
+     {
+        //float3 col = texture(texSampler, texFrg);
+        float3 color = sourceTexture.Sample(sourceSampler, (texcoord));
+     }
+    
+     //float3 color = col;
+     **/
+
+    //float2 lensCenter = Params6.xy;
+    
+    float2 lensCenter = float2(2.0 * Params6.xy - 1.0); // convert to [-1,1]
+
+
+    //float2 lensCenter = float2(1.0,0.0);
+
+    float3 col = float3(0.0,0.0,0.0); // base color
+    //float alpha = 0.2; /* lens parameter */
+    float alpha = Params7.x;
+    /* Left/Right eye are slightly off centre */
+    /* Normalize to [-1, 1] and put the centre to "centre" */
+    float2 p1 = float2(2.0 * texcoord - 1.0 - lensCenter);
+    //float2 p1 = float2(2.0 * texcoord - 1.0) - lensCenter;
+    //float2 p1;
+    //p1.x = texcoord.x - lensCenter.x;
+    //p1.y = texcoord.y - lensCenter.y;
+    /* Transform */
+    float2 p2 = p1 / (1.0 - alpha * length(p1));
+    /* Back to [0, 1] */
+    p2 = (p2 + lensCenter + 1.0) * 0.5;
+    if (all(greaterThanEqual(p2, float2(0.0, 0.0))) && all(lessThanEqual(p2, float2(1.0, 1.0)))) {
+        col = SAMPLE_TEXTURE(p2).rgb;
+    }
+    float3 color = col;
 #endif
 
 #ifdef PASS_THROUGH_USE_GAINS

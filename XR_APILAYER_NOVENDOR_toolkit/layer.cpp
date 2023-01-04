@@ -166,6 +166,7 @@ namespace {
             m_configManager->setDefault(config::SettingPostChromaticCorrectionYB, 10000);
             m_configManager->setDefault(config::SettingPostChromaticCorrectionLensCenterX, 500);
             m_configManager->setDefault(config::SettingPostChromaticCorrectionLensCenterY, 500);
+            m_configManager->setDefault(config::SettingPostChromaticCorrectionLensAlpha, 0);
             m_configManager->setDefault(config::SettingPostChromaticCorrectionShowCenter, 0);
 
             // TODO: Appearance (User)

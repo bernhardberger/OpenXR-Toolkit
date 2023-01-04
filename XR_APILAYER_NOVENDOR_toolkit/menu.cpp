@@ -1830,6 +1830,15 @@ namespace {
             m_menuEntries.back().expert = true;
             m_menuEntries.back().acceleration = 5;
             m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Lens alpha",
+                                     MenuEntryType::Slider,
+                                     SettingPostChromaticCorrectionLensAlpha,
+                                     0,
+                                     1000,
+                                     MenuEntry::FmtDecimal<2>});
+            m_menuEntries.back().expert = true;
+            m_menuEntries.back().acceleration = 5;
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
                                      "Show lens center",
                                      MenuEntryType::Choice,
                                      SettingPostChromaticCorrectionShowCenter,

@@ -202,6 +202,7 @@ namespace toolkit {
         const std::string SettingPostChromaticCorrectionLensCenterX = "post_ca_lens_center_x";
         const std::string SettingPostChromaticCorrectionLensCenterY = "post_ca_lens_center_y";
         const std::string SettingPostChromaticCorrectionShowCenter = "post_ca_show_center";
+        const std::string SettingPostChromaticCorrectionLensAlpha = "post_ca_lens_alpha";
 
         enum class OffOnType { Off = 0, On, MaxValue };
         enum class NoYesType { No = 0, Yes, MaxValue };

@@ -43,6 +43,7 @@ namespace {
         XrVector4f Params4; // X axis: ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (0.9..1.1 params)
         XrVector4f Params5; // Y axis: ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (0.9..1.1 params)
         XrVector4f Params6; // LensCenterX, LensCenterY (-1..+1 params), ShowCenter (0-1)
+        XrVector4f Params7; // LensAlpha 0..1
     };
 
     class ImageProcessor : public IImageProcessor {
@@ -138,6 +139,7 @@ namespace {
                        m_configManager->hasChanged(SettingPostChromaticCorrectionYB) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterX) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionLensAlpha) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionShowCenter);                           
             } else {
                 return m_configManager->hasChanged(SettingPostColorGainR) ||
@@ -151,6 +153,7 @@ namespace {
                        m_configManager->hasChanged(SettingPostChromaticCorrectionYB) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterX) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionLensCenterY) ||
+                       m_configManager->hasChanged(SettingPostChromaticCorrectionLensAlpha) ||
                        m_configManager->hasChanged(SettingPostChromaticCorrectionShowCenter);
             }
         }
@@ -191,9 +194,13 @@ namespace {
                 const auto param = XMLoadSInt4(&params[5]) * 0.001f;
                 StoreXrVector4(&m_config.Params6, param);
             }
+            {
+                const auto param = XMLoadSInt4(&params[6]) * 0.001f;
+                StoreXrVector4(&m_config.Params7, param);
+            }
         }
 
-        static std::array<DirectX::XMINT4, 6> GetParams(const IConfigManager* configManager, size_t index) {
+        static std::array<DirectX::XMINT4, 7> GetParams(const IConfigManager* configManager, size_t index) {
             using namespace DirectX;
             if (configManager) {
                 static const char* lut[] = {"", "_u1", "_u2", "_u3", "_u4"}; // placeholder up to 4
@@ -224,14 +231,22 @@ namespace {
                         XMINT4(configManager->getValue(SettingPostChromaticCorrectionLensCenterX),
                                configManager->getValue(SettingPostChromaticCorrectionLensCenterY),
                                configManager->getValue(SettingPostChromaticCorrectionShowCenter),
-                               0)};
+                               0),
+                        XMINT4(configManager->getValue(SettingPostChromaticCorrectionLensAlpha),
+                               0,
+                               0,
+                               0)
+                };
             }
             return {XMINT4(500, 500, 500, 500),
                     XMINT4(500, 500, 500, 0),
                     XMINT4(1000, 0, 0, 0),
                     XMINT4(10000, 10000, 10000, 0),
                     XMINT4(10000, 10000, 10000, 0),
-                    XMINT4(500, 500, 0, 0)};
+                    XMINT4(500, 500, 0, 0),
+                    XMINT4(1000, 0, 0, 0)
+            };
+
         }
 
         static std::array<DirectX::XMINT4, 3> GetPreset(size_t index) {
@@ -260,7 +275,7 @@ namespace {
 
         const std::shared_ptr<IConfigManager> m_configManager;
         const std::shared_ptr<IDevice> m_device;
-        const std::array<DirectX::XMINT4, 6> m_userParams;
+        const std::array<DirectX::XMINT4, 7> m_userParams;
 
         std::shared_ptr<IQuadShader> m_shaders[2]; // off, on
         std::shared_ptr<IShaderBuffer> m_cbParams;
