@@ -55,6 +55,12 @@ namespace {
             initializeUpscaler();
         }
 
+        CASUpscaler(std::shared_ptr<IConfigManager> configManager,
+                    std::shared_ptr<IDevice> graphicsDevice)
+            : m_configManager(configManager), m_device(graphicsDevice), m_isSharpenOnly(true) {
+            initializeUpscaler();
+        }
+
         void reload() override {
             initializeUpscaler();
         }
@@ -146,7 +152,7 @@ namespace toolkit::graphics {
         return std::make_shared<CASUpscaler>(configManager, graphicsDevice, settingScaling, settingAnamorphic);
     }
 
-    std::shared_ptr<IImageProcessor> CreateCASUpscaler(std::shared_ptr<IConfigManager> configManager,
+    std::shared_ptr<ISharpener> CreateCASSharpener(std::shared_ptr<IConfigManager> configManager,
                                                        std::shared_ptr<IDevice> graphicsDevice) {
         return std::make_shared<CASUpscaler>(configManager, graphicsDevice);
     }
