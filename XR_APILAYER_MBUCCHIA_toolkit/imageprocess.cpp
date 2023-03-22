@@ -109,13 +109,13 @@ namespace {
             if (caPassEnabled)
                 intermediateTexturesNeeded++;
 
-            intermediateTexturesNeeded = 3;
+            intermediateTexturesNeeded = 2;
             
             if (intermediateTexturesNeeded > 0 && textures.size() != intermediateTexturesNeeded) {
                 textures.clear();
                 const auto outputInfo = output->getInfo();
                 auto createInfo = outputInfo;
-                createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
+                createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
 
                 for (int i = 0; i < intermediateTexturesNeeded; i++) {
                     textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
@@ -158,13 +158,11 @@ namespace {
                 m_device->setShader(m_shaderCA, SamplerType::LinearClamp);
                 m_device->setShaderInput(0, m_cbParams);
                 m_device->setShaderInput(0, textures[1]);
-                m_device->setShaderOutput(0, textures[2]);
+                m_device->setShaderOutput(0, output);
                 m_device->dispatchShader();
             } else {
-                textures[1]->copyTo(textures[2]);
+                textures[1]->copyTo(output);
             }
-
-            textures[2]->copyTo(output);
         }
 
       private:
