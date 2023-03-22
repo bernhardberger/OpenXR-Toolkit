@@ -1590,37 +1590,7 @@ namespace {
             m_menuEntries.back().acceleration = 5;
             postProcessGroup.finalize();
 
-            if (menuInfo.isCACorrectionNeed) {
-                m_menuEntries.push_back({MenuIndent::OptionIndent,
-                                         "CA Correction",
-                                         MenuEntryType::Choice,
-                                         SettingPostChromaticCorrection,
-                                         0,
-                                         MenuEntry::LastVal<PostProcessCACorrectionType>(),
-                                         MenuEntry::FmtEnum<PostProcessCACorrectionType>});
-
-                MenuGroup caCorrectionGroup(this, [&] {
-                    return m_configManager->peekEnumValue<PostProcessCACorrectionType>(SettingPostChromaticCorrection) !=
-                           PostProcessCACorrectionType::Off;
-                });
-                m_menuEntries.push_back({MenuIndent::SubGroupIndent,
-                                         "Red",
-                                         MenuEntryType::Slider,
-                                         SettingPostChromaticCorrectionR,
-                                         98000,
-                                         102000,
-                                         MenuEntry::FmtDecimal<3, -100000>});
-                m_menuEntries.back().acceleration = 5;
-                m_menuEntries.push_back({MenuIndent::SubGroupIndent,
-                                         "Blue",
-                                         MenuEntryType::Slider,
-                                         SettingPostChromaticCorrectionB,
-                                         98000,
-                                         102000,
-                                         MenuEntry::FmtDecimal<3, -100000>});
-                m_menuEntries.back().acceleration = 5;
-                caCorrectionGroup.finalize();
-            }
+          
 
             m_menuEntries.push_back({MenuIndent::OptionIndent,
                                      "Sharpening",
@@ -1645,6 +1615,38 @@ namespace {
                                      MenuEntry::FmtPercent});
 
             postSharpenerGroup.finalize();
+
+            if (menuInfo.isCACorrectionNeed) {
+                m_menuEntries.push_back({MenuIndent::OptionIndent,
+                                         "CA Correction",
+                                         MenuEntryType::Choice,
+                                         SettingPostChromaticCorrection,
+                                         0,
+                                         MenuEntry::LastVal<PostProcessCACorrectionType>(),
+                                         MenuEntry::FmtEnum<PostProcessCACorrectionType>});
+
+                MenuGroup caCorrectionGroup(this, [&] {
+                    return m_configManager->peekEnumValue<PostProcessCACorrectionType>(
+                               SettingPostChromaticCorrection) != PostProcessCACorrectionType::Off;
+                });
+                m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                         "Red",
+                                         MenuEntryType::Slider,
+                                         SettingPostChromaticCorrectionR,
+                                         98000,
+                                         102000,
+                                         MenuEntry::FmtDecimal<3, -100000>});
+                m_menuEntries.back().acceleration = 5;
+                m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                         "Blue",
+                                         MenuEntryType::Slider,
+                                         SettingPostChromaticCorrectionB,
+                                         98000,
+                                         102000,
+                                         MenuEntry::FmtDecimal<3, -100000>});
+                m_menuEntries.back().acceleration = 5;
+                caCorrectionGroup.finalize();
+            }
 
             m_menuEntries.push_back(
                 {MenuIndent::OptionIndent, "World scale", MenuEntryType::Slider, SettingICD, 1, 10000, [&](int value) {
