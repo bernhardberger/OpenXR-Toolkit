@@ -117,6 +117,11 @@ namespace {
                 auto createInfo = outputInfo;
                 createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
 
+                if (m_device->isTextureFormatSRGB(createInfo.format)) {
+                    // Good balance between visuals and performance.
+                    createInfo.format = m_device->getTextureFormat(graphics::TextureFormat::R10G10B10A2_UNORM);
+                }
+
                 for (int i = 0; i < intermediateTexturesNeeded; i++) {
                     textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
                 }
