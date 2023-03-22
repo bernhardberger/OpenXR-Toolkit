@@ -99,89 +99,72 @@ namespace {
             // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
             m_cbParams->uploadData(config, sizeof(*config));
 
-            int additionalTextures = 2;
+            int intermediateTexturesNeeded = 0;
             const bool sharpeningPassEnabled = m_sharpenerType != PostProcessSharpenerType::Off;
-            const bool caEnabled = m_caCorrectionType != PostProcessCACorrectionType::Off;
+            const bool caPassEnabled = m_caCorrectionType != PostProcessCACorrectionType::Off;
+
+            if (sharpeningPassEnabled)
+                intermediateTexturesNeeded++;
+
+            if (caPassEnabled)
+                intermediateTexturesNeeded++;
+
+            intermediateTexturesNeeded = 3;
             
-            /*if (sharpeningPassEnabled && caEnabled)
-                additionalTextures = 2;
-
-            if (sharpeningPassEnabled != caEnabled)
-                additionalTextures = 1;*/
-
-
-            if (additionalTextures > 0 && textures.size() < additionalTextures) {
+            if (intermediateTexturesNeeded > 0 && textures.size() != intermediateTexturesNeeded) {
                 textures.clear();
                 const auto outputInfo = output->getInfo();
+                auto createInfo = outputInfo;
+                createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
 
-                for (int i = 0; i < additionalTextures; i++) {
-                    const auto outputInfo = output->getInfo();
-                    auto createInfo = outputInfo;
-
-                    createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
+                for (int i = 0; i < intermediateTexturesNeeded; i++) {
                     textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
                 }
             } else {
-                if (!textures.empty()) {
+                // TODO: clean up textures when we no longer need them
+               /*if (!textures.empty()) {
                     textures[0].reset();
+                    textures[1].reset();
                     textures.clear();
-                }
+                }*/
             }
 
-            //if (caEnabled != sharpeningPassEnabled) {
-            //    const auto outputInfo = output->getInfo();
-            //    if (textures.empty() || textures[0]->getInfo().width != outputInfo.width ||
-            //        textures[0]->getInfo().height != outputInfo.height) {
-            //        textures.clear();
-            //        auto createInfo = outputInfo;
-
-            //        // Good balance between visuals and performance.
-            //        createInfo.format = m_device->getTextureFormat(TextureFormat::R16G16B16A16_UNORM);
-
-            //        createInfo.createFlags |= D3D11_BIND_SHADER_RESOURCE;
-            //        createInfo.createFlags |= D3D11_BIND_UNORDERED_ACCESS;
-
-            //        createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
-            //        textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
-            //    }
-            //}
-
-
-            // First pass
+            // Image PostProcessing Pass
             m_device->setShader(m_shaderPP, SamplerType::LinearClamp);
             m_device->setShaderInput(0, m_cbParams);
             m_device->setShaderInput(0, input);
-            m_device->setShaderOutput(0, sharpeningPassEnabled || caEnabled ? textures[0] : output);
+            m_device->setShaderOutput(0, textures[0]);
             m_device->dispatchShader();
 
             SharpenerState sharpenerState;
 
             // Sharpening pass
             if (sharpeningPassEnabled) {
+                //Log("Executing Sharpening pass.");
                 m_sharpener->process(textures[0],
-                                     caEnabled ? textures[1] : output,
-                                     //output,
+                                     textures[1],
                                      sharpenerState.textures,
                                      sharpenerState.blob,
                                      m_configManager->getValue(SettingPostSharpness) / 100.0f,
                                      eye
                 );
-
-               /* if (caEnabled) {
-                    textures[1] = textures[0];
-                } else {
-                    output = textures[0];
-                }*/
+            } else {
+                textures[0]->copyTo(textures[1]);
             }
 
-            // Last pass
-            if (caEnabled) {
+            // CA Pass
+            if (caPassEnabled) {
+                //Log("Executing Chromatic Aberration Correction pass.");
                 m_device->setShader(m_shaderCA, SamplerType::LinearClamp);
                 m_device->setShaderInput(0, m_cbParams);
-                m_device->setShaderInput(0, textures[sharpeningPassEnabled ? 1 : 0]);
-                m_device->setShaderOutput(0, output);
+                m_device->setShaderInput(0, textures[1]);
+                m_device->setShaderOutput(0, textures[2]);
                 m_device->dispatchShader();
+            } else {
+                textures[1]->copyTo(textures[2]);
             }
+
+            textures[2]->copyTo(output);
         }
 
       private:
@@ -196,20 +179,36 @@ namespace {
             if (m_mode == PostProcessType::On) {
                 m_shaderPP =
                     m_device->createQuadShader(shaderFile, "mainPostProcess", "Postprocess PS", defines.get());
+
+                if (!m_shaderPP) {
+                    Log("Failed to load Postprocess PS shader.");
+                }
             } else {
                 defines.add("PASS_THROUGH_USE_GAINS", true);
 
                 m_shaderPP =
                     m_device->createQuadShader(shaderFile, "mainPassThrough", "Passthrough PS", defines.get());
+
+                if (!m_shaderPP) {
+                    Log("Failed to load Passthrough PS shader.");
+                }
             }
             
             if (m_caCorrectionType == PostProcessCACorrectionType::VarjoGeneric) {
                 m_shaderCA = 
                     m_device->createQuadShader(shaderFile, "mainCACorrectionVarjoGeneric", "CACorrection PS", defines.get());
+
+                if (!m_shaderCA) {
+                    Log("Failed to load Chromatic Aberration Correction shader.");
+                }
             }
 
             if (m_sharpenerType == PostProcessSharpenerType::CAS) {
                 m_sharpener = graphics::CreateCASSharpener(m_configManager, m_device);
+
+                if (!m_sharpener) {
+                    Log("Failed to load CAS Sharpener.");
+                }
             }
 
 
@@ -327,7 +326,6 @@ namespace {
 
         std::shared_ptr<IQuadShader> m_shaderPP;
         std::shared_ptr<IQuadShader> m_shaderCA;
-
         std::shared_ptr<graphics::ISharpener> m_sharpener;
 
         std::shared_ptr<IShaderBuffer> m_cbParams;
