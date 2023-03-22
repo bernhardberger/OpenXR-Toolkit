@@ -44,7 +44,14 @@ namespace {
                             // Eye (0 = left, 1 = right)
     };
 
+    struct SharpenerState {
+        std::array<uint8_t, 1024> blob;
+        std::vector<std::shared_ptr<graphics::ITexture>> textures;
+    };
+
     class ImageProcessor : public IImageProcessor {
+        
+
       public:
         ImageProcessor(std::shared_ptr<IConfigManager> configManager, std::shared_ptr<IDevice> graphicsDevice)
             : m_configManager(configManager), m_device(graphicsDevice),
@@ -60,11 +67,13 @@ namespace {
             // Generic implementation to support more than just Off/On modes in the future.
             const auto mode = m_configManager->getEnumValue<PostProcessType>(config::SettingPostProcess);
             const auto caCorrection = m_configManager->getEnumValue<PostProcessCACorrectionType>(config::SettingPostChromaticCorrection);
-            const auto hasModeChanged = mode != m_mode || caCorrection != m_caCorrectionType;
+            const auto sharpenerType = m_configManager->getEnumValue<PostProcessSharpenerType>(config::SettingPostSharpenerType);
+            const auto hasModeChanged = mode != m_mode || caCorrection != m_caCorrectionType || sharpenerType != m_sharpenerType;
 
             if (hasModeChanged) {
                 m_mode = mode;
                 m_caCorrectionType = caCorrection;
+                m_sharpenerType = sharpenerType;
                 reload();
             }
                 
@@ -90,16 +99,26 @@ namespace {
             // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
             m_cbParams->uploadData(config, sizeof(*config));
 
-           
-            if (m_caCorrectionType != PostProcessCACorrectionType::Off) {
+            int additionalTextures = 2;
+            const bool sharpeningPassEnabled = m_sharpenerType != PostProcessSharpenerType::Off;
+            const bool caEnabled = m_caCorrectionType != PostProcessCACorrectionType::Off;
+            
+            /*if (sharpeningPassEnabled && caEnabled)
+                additionalTextures = 2;
+
+            if (sharpeningPassEnabled != caEnabled)
+                additionalTextures = 1;*/
+
+
+            if (additionalTextures > 0 && textures.size() < additionalTextures) {
+                textures.clear();
                 const auto outputInfo = output->getInfo();
-                if (textures.empty() || textures[0]->getInfo().width != outputInfo.width ||
-                    textures[0]->getInfo().height != outputInfo.height) {
-                    textures.clear();
+
+                for (int i = 0; i < additionalTextures; i++) {
+                    const auto outputInfo = output->getInfo();
                     auto createInfo = outputInfo;
 
-                    createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | 
-                        XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
+                    createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
                     textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
                 }
             } else {
@@ -109,18 +128,57 @@ namespace {
                 }
             }
 
-             // First pass
+            //if (caEnabled != sharpeningPassEnabled) {
+            //    const auto outputInfo = output->getInfo();
+            //    if (textures.empty() || textures[0]->getInfo().width != outputInfo.width ||
+            //        textures[0]->getInfo().height != outputInfo.height) {
+            //        textures.clear();
+            //        auto createInfo = outputInfo;
+
+            //        // Good balance between visuals and performance.
+            //        createInfo.format = m_device->getTextureFormat(TextureFormat::R16G16B16A16_UNORM);
+
+            //        createInfo.createFlags |= D3D11_BIND_SHADER_RESOURCE;
+            //        createInfo.createFlags |= D3D11_BIND_UNORDERED_ACCESS;
+
+            //        createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT;
+            //        textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
+            //    }
+            //}
+
+
+            // First pass
             m_device->setShader(m_shaderPP, SamplerType::LinearClamp);
             m_device->setShaderInput(0, m_cbParams);
             m_device->setShaderInput(0, input);
-            m_device->setShaderOutput(0, m_caCorrectionType == PostProcessCACorrectionType::Off ? output : textures[0]);
+            m_device->setShaderOutput(0, sharpeningPassEnabled || caEnabled ? textures[0] : output);
             m_device->dispatchShader();
 
-            // Second pass
-            if (m_caCorrectionType != PostProcessCACorrectionType::Off) {
+            SharpenerState sharpenerState;
+
+            // Sharpening pass
+            if (sharpeningPassEnabled) {
+                m_sharpener->process(textures[0],
+                                     caEnabled ? textures[1] : output,
+                                     //output,
+                                     sharpenerState.textures,
+                                     sharpenerState.blob,
+                                     m_configManager->getValue(SettingPostSharpness) / 100.0f,
+                                     eye
+                );
+
+               /* if (caEnabled) {
+                    textures[1] = textures[0];
+                } else {
+                    output = textures[0];
+                }*/
+            }
+
+            // Last pass
+            if (caEnabled) {
                 m_device->setShader(m_shaderCA, SamplerType::LinearClamp);
                 m_device->setShaderInput(0, m_cbParams);
-                m_device->setShaderInput(0, textures[0]);
+                m_device->setShaderInput(0, textures[sharpeningPassEnabled ? 1 : 0]);
                 m_device->setShaderOutput(0, output);
                 m_device->dispatchShader();
             }
@@ -150,6 +208,10 @@ namespace {
                     m_device->createQuadShader(shaderFile, "mainCACorrectionVarjoGeneric", "CACorrection PS", defines.get());
             }
 
+            if (m_sharpenerType == PostProcessSharpenerType::CAS) {
+                m_sharpener = graphics::CreateCASSharpener(m_configManager, m_device);
+            }
+
 
             // TODO: For now, we're going to require that all image processing shaders share the same configuration
             // structure.
@@ -160,18 +222,19 @@ namespace {
 
         bool checkUpdateConfig() const {
             return m_configManager->hasChanged(SettingPostSunGlasses) ||
-                    m_configManager->hasChanged(SettingPostContrast) ||
-                    m_configManager->hasChanged(SettingPostBrightness) ||
-                    m_configManager->hasChanged(SettingPostExposure) ||
-                    m_configManager->hasChanged(SettingPostSaturation) ||
-                    m_configManager->hasChanged(SettingPostVibrance) ||
-                    m_configManager->hasChanged(SettingPostHighlights) ||
-                    m_configManager->hasChanged(SettingPostShadows) ||
-                    m_configManager->hasChanged(SettingPostColorGainR) ||
-                    m_configManager->hasChanged(SettingPostColorGainG) ||
-                    m_configManager->hasChanged(SettingPostColorGainB) ||
-                    m_configManager->hasChanged(SettingPostChromaticCorrectionR) ||
-                    m_configManager->hasChanged(SettingPostChromaticCorrectionB);
+                   m_configManager->hasChanged(SettingPostContrast) ||
+                   m_configManager->hasChanged(SettingPostBrightness) ||
+                   m_configManager->hasChanged(SettingPostExposure) ||
+                   m_configManager->hasChanged(SettingPostSaturation) ||
+                   m_configManager->hasChanged(SettingPostVibrance) ||
+                   m_configManager->hasChanged(SettingPostHighlights) ||
+                   m_configManager->hasChanged(SettingPostShadows) ||
+                   m_configManager->hasChanged(SettingPostColorGainR) ||
+                   m_configManager->hasChanged(SettingPostColorGainG) ||
+                   m_configManager->hasChanged(SettingPostColorGainB) ||
+                   m_configManager->hasChanged(SettingPostChromaticCorrectionR) ||
+                   m_configManager->hasChanged(SettingPostChromaticCorrectionB) ||
+                   m_configManager->hasChanged(SettingPostSharpness);
         }
 
         void updateConfig() {
@@ -265,10 +328,13 @@ namespace {
         std::shared_ptr<IQuadShader> m_shaderPP;
         std::shared_ptr<IQuadShader> m_shaderCA;
 
+        std::shared_ptr<graphics::ISharpener> m_sharpener;
+
         std::shared_ptr<IShaderBuffer> m_cbParams;
 
         PostProcessType m_mode{PostProcessType::Off};
         PostProcessCACorrectionType m_caCorrectionType{PostProcessCACorrectionType::Off};
+        PostProcessSharpenerType m_sharpenerType{PostProcessSharpenerType::Off};
         ImageProcessorConfig m_config{};
     };
 

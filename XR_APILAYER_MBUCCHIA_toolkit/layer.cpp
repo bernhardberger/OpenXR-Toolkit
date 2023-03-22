@@ -2883,7 +2883,8 @@ namespace {
                                                 swapchainState.upscaledTexture,
                                                 swapchainState.upscalerTextures,
                                                 swapchainState.upscalerBlob,
-                                                (utilities::Eye)eye);
+                                                (utilities::Eye)eye
+                            );
                             timer->stop();
 
                             nextInput = swapchainState.upscaledTexture;

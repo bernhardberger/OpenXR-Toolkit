@@ -44,7 +44,7 @@ namespace {
         uint32_t Const1[4];
     };
 
-    class CASUpscaler : public IImageProcessor {
+    class CASUpscaler : public ISharpener {
       public:
         CASUpscaler(std::shared_ptr<IConfigManager> configManager,
                     std::shared_ptr<IDevice> graphicsDevice,
@@ -67,6 +67,16 @@ namespace {
                      std::vector<std::shared_ptr<ITexture>>& textures,
                      std::array<uint8_t, 1024>& blob,
                      std::optional<utilities::Eye> eye = std::nullopt) override {
+            process(input, output, textures, blob, m_configManager->getValue(SettingSharpness) / 100.f, eye);
+        }
+
+        void process(std::shared_ptr<ITexture> input,
+                     std::shared_ptr<ITexture> output,
+                     std::vector<std::shared_ptr<ITexture>>& textures,
+                     std::array<uint8_t, 1024>& blob,
+                     float sharpness,
+                     std::optional<utilities::Eye> eye = std::nullopt
+            ) override {
             // We need to use a per-instance blob.
             static_assert(sizeof(CASConstants) <= 1024);
             CASConstants* const config = reinterpret_cast<CASConstants*>(blob.data());
@@ -76,7 +86,6 @@ namespace {
             const auto inputHeight = input->getInfo().height;
             const auto outputWidth = output->getInfo().width;
             const auto outputHeight = output->getInfo().height;
-            const float sharpness = m_configManager->getValue(SettingSharpness) / 100.f;
 
             CasSetup(config->Const0,
                      config->Const1,
@@ -135,6 +144,11 @@ namespace toolkit::graphics {
                                                        int settingScaling,
                                                        int settingAnamorphic) {
         return std::make_shared<CASUpscaler>(configManager, graphicsDevice, settingScaling, settingAnamorphic);
+    }
+
+    std::shared_ptr<IImageProcessor> CreateCASUpscaler(std::shared_ptr<IConfigManager> configManager,
+                                                       std::shared_ptr<IDevice> graphicsDevice) {
+        return std::make_shared<CASUpscaler>(configManager, graphicsDevice);
     }
 
 } // namespace toolkit::graphics

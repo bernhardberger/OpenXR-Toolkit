@@ -1622,6 +1622,30 @@ namespace {
                 caCorrectionGroup.finalize();
             }
 
+            m_menuEntries.push_back({MenuIndent::OptionIndent,
+                                     "Sharpening",
+                                     MenuEntryType::Choice,
+                                     SettingPostSharpenerType,
+                                     0,
+                                     MenuEntry::LastVal<PostProcessSharpenerType>(),
+                                     MenuEntry::FmtEnum<PostProcessSharpenerType>});
+
+
+            MenuGroup postSharpenerGroup(this, [&] {
+                return m_configManager->peekEnumValue<PostProcessSharpenerType>(SettingPostSharpenerType) !=
+                       PostProcessSharpenerType::Off;
+            });
+            
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Sharpness",
+                                     MenuEntryType::Slider,
+                                     SettingPostSharpness,
+                                     0,
+                                     100,
+                                     MenuEntry::FmtPercent});
+
+            postSharpenerGroup.finalize();
+
             m_menuEntries.push_back(
                 {MenuIndent::OptionIndent, "World scale", MenuEntryType::Slider, SettingICD, 1, 10000, [&](int value) {
                      return fmt::format("{:.1f}% ({:.1f}mm)", value / 10.f, m_stats.icd * 1000);

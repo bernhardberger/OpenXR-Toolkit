@@ -26,7 +26,7 @@
 cbuffer config : register(b0) {
     float4 Params1;  // Contrast, Brightness, Exposure, Saturation (-1..+1 params)
     float4 Params2;  // ColorGainR, ColorGainG, ColorGainB (-1..+1 params)
-    float4 Params3;  // Highlights, Shadows, Vibrance (0..1 params)
+    float4 Params3;  // Highlights, Shadows, Vibrance (0..1 params), SharpeningAmount (unused here)
     float4 Params4;  // ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (-1..+1 params), Eye (0 = left, 1 = right)
 };
 

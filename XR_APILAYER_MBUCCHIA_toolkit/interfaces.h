@@ -180,6 +180,8 @@ namespace toolkit {
         const std::string SettingPostColorGainB = "post_gain_b";
         const std::string SettingPostHighlights = "post_highlights";
         const std::string SettingPostShadows = "post_shadows";
+        const std::string SettingPostSharpenerType = "post_sharpener_type";
+        const std::string SettingPostSharpness = "post_sharpness";
         const std::string SettingPostChromaticCorrection = "post_ca";
         const std::string SettingPostChromaticCorrectionR = "post_ca_r";
         const std::string SettingPostChromaticCorrectionB = "post_ca_b";
@@ -215,6 +217,7 @@ namespace toolkit {
         enum class VariableShadingRateVal { R_x1, R_2x1, R_2x2, R_4x2, R_4x4, R_Cull, MaxValue };
         enum class PostProcessType { Off = 0, On, MaxValue };
         enum class PostProcessCACorrectionType { Off = 0, VarjoGeneric, MaxValue };
+        enum class PostProcessSharpenerType { Off = 0, CAS, MaxValue };
         enum class PostSunGlassesType { None = 0, Light, Dark, Night, MaxValue };
         enum class FovModeType { Simple, Advanced, MaxValue };
         enum class ScreenshotFileFormat { DDS = 0, PNG, JPG, BMP, MaxValue };
@@ -698,6 +701,15 @@ namespace toolkit {
                                  std::shared_ptr<ITexture> output,
                                  std::vector<std::shared_ptr<ITexture>>& textures,
                                  std::array<uint8_t, 1024>& blob,
+                                 std::optional<utilities::Eye> eye = std::nullopt) = 0;
+        };
+
+        struct ISharpener : IImageProcessor {
+            virtual void process(std::shared_ptr<ITexture> input,
+                                 std::shared_ptr<ITexture> output,
+                                 std::vector<std::shared_ptr<ITexture>>& textures,
+                                 std::array<uint8_t, 1024>& blob,
+                                 float sharpness,
                                  std::optional<utilities::Eye> eye = std::nullopt) = 0;
         };
 
