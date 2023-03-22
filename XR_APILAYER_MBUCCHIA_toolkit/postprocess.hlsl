@@ -212,6 +212,11 @@ float4 mainPassThrough(in float4 position : SV_POSITION, in float2 texcoord : TE
   return float4(saturate(color), 1.0);
 }
 
+float4 mainJustSample(in float4 position : SV_POSITION, in float2 texcoord : TEXCOORD0) : SV_TARGET {
+  float3 color = SAMPLE_TEXTURE(texcoord).rgb;
+  return float4(color, 1.0);
+}
+
 float4 mainCACorrectionVarjoGeneric(in float4 position : SV_POSITION, in float2 texcoord : TEXCOORD0) : SV_TARGET {
     float3 color;
     float2 correctionOrigin = float2(0.313, 0.42);

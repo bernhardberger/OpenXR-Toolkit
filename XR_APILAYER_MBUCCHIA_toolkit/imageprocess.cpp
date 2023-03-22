@@ -154,7 +154,11 @@ namespace {
                                      eye
                 );
             } else {
-                textures[0]->copyTo(textures[1]);
+                m_device->setShader(m_shaderJustSample, SamplerType::LinearClamp);
+                m_device->setShaderInput(0, m_cbParams);
+                m_device->setShaderInput(0, textures[0]);
+                m_device->setShaderOutput(0, textures[1]);
+                m_device->dispatchShader();
             }
 
             // CA Pass
@@ -166,7 +170,11 @@ namespace {
                 m_device->setShaderOutput(0, output);
                 m_device->dispatchShader();
             } else {
-                textures[1]->copyTo(output);
+                m_device->setShader(m_shaderJustSample, SamplerType::LinearClamp);
+                m_device->setShaderInput(0, m_cbParams);
+                m_device->setShaderInput(0, textures[1]);
+                m_device->setShaderOutput(0, output);
+                m_device->dispatchShader();
             }
         }
 
@@ -178,6 +186,12 @@ namespace {
             utilities::shader::Defines defines;
             // defines.add("POST_PROCESS_SRC_SRGB", true);
             // defines.add("POST_PROCESS_DST_SRGB", true);
+
+             m_shaderJustSample = m_device->createQuadShader(shaderFile, "mainJustSample", "JustSample", defines.get());
+
+            if (!m_shaderPP) {
+                Log("Failed to load Postprocess PS shader.");
+            }
 
             if (m_mode == PostProcessType::On) {
                 m_shaderPP =
@@ -329,6 +343,7 @@ namespace {
 
         std::shared_ptr<IQuadShader> m_shaderPP;
         std::shared_ptr<IQuadShader> m_shaderCA;
+        std::shared_ptr<IQuadShader> m_shaderJustSample;
         std::shared_ptr<graphics::ISharpener> m_sharpener;
 
         std::shared_ptr<IShaderBuffer> m_cbParams;
