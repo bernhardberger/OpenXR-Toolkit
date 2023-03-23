@@ -1179,7 +1179,7 @@ namespace {
             m_useAnamorphic = m_originalAnamorphicValue > 0 ? 1 : 0;
 
             m_menuEntries.push_back({MenuIndent::OptionIndent,
-                                     "Upscaling/Sharpening",
+                                     "Upscaling",
                                      MenuEntryType::Choice,
                                      SettingScalingType,
                                      0,
