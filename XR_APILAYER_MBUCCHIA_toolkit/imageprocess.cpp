@@ -39,7 +39,7 @@ namespace {
     struct alignas(16) ImageProcessorConfig {
         XrVector4f Params1; // Contrast, Brightness, Exposure, Saturation (-1..+1 params)
         XrVector4f Params2; // ColorGainR, ColorGainG, ColorGainB (-1..+1 params)
-        XrVector4f Params3; // Highlights, Shadows, Vibrance (0..1 params), UseCA (0 = off, 1 = on)
+        XrVector4f Params3; // Highlights, Shadows, Vibrance (0..1 params), <currently unused>
         XrVector4f Params4; // ChromaticCorrectionR, ChromaticCorrectionG, ChromaticCorrectionB (-1..+1 params)
                             // Eye (0 = left, 1 = right)
     };
@@ -50,6 +50,13 @@ namespace {
     };
 
     class ImageProcessor : public IImageProcessor {
+    using ProcessingFunction = std::function<void(const std::shared_ptr<ITexture>&, std::shared_ptr<ITexture>&, std::optional<utilities::Eye> eye)>;
+    
+    struct PassSettings {
+        bool enabled;
+        ProcessingFunction function;
+    };
+
         
 
       public:
@@ -99,135 +106,125 @@ namespace {
             // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
             m_cbParams->uploadData(config, sizeof(*config));
 
-            int intermediateTexturesNeeded = 0;
-            const bool sharpeningPassEnabled = m_sharpenerType != PostProcessSharpenerType::Off;
-            const bool caPassEnabled = m_caCorrectionType != PostProcessCACorrectionType::Off;
+            std::shared_ptr<ITexture> currentInput = input;
+            std::shared_ptr<ITexture> currentOutput;
 
-            if (sharpeningPassEnabled)
-                intermediateTexturesNeeded++;
+            for (size_t i = 0; i < m_passSettings.size(); ++i) {
+                if (m_passSettings[i].enabled) {
+                    // Create the output texture only if the pass is enabled
+                    auto currentOutput = createIntermediateTexture(output->getInfo());
+                    // Execute the pass
+                    m_passSettings[i].function(currentInput,  currentOutput, eye); 
 
-            if (caPassEnabled)
-                intermediateTexturesNeeded++;
-
-            intermediateTexturesNeeded = 2;
-            
-            if (intermediateTexturesNeeded > 0 && textures.size() != intermediateTexturesNeeded) {
-                textures.clear();
-                const auto outputInfo = output->getInfo();
-                auto createInfo = outputInfo;
-                createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-
-                if (m_device->isTextureFormatSRGB(createInfo.format)) {
-                    // Good balance between visuals and performance.
-                    createInfo.format = m_device->getTextureFormat(graphics::TextureFormat::R10G10B10A2_UNORM);
+                    // Set the output of the current pass as the input for the next pass
+                    currentInput = currentOutput;
                 }
-
-                for (int i = 0; i < intermediateTexturesNeeded; i++) {
-                    textures.push_back(m_device->createTexture(createInfo, "PostProcessor Intermediate Texture"));
-                }
-            } else {
-                // TODO: clean up textures when we no longer need them
-               /*if (!textures.empty()) {
-                    textures[0].reset();
-                    textures[1].reset();
-                    textures.clear();
-                }*/
             }
 
-            // Image PostProcessing Pass
-            m_device->setShader(m_shaderPP, SamplerType::LinearClamp);
-            m_device->setShaderInput(0, m_cbParams);
-            m_device->setShaderInput(0, input);
-            m_device->setShaderOutput(0, textures[0]);
-            m_device->dispatchShader();
-
-            SharpenerState sharpenerState;
-
-            // Sharpening pass
-            if (sharpeningPassEnabled) {
-                //Log("Executing Sharpening pass.");
-                m_sharpener->process(textures[0],
-                                     textures[1],
-                                     sharpenerState.textures,
-                                     sharpenerState.blob,
-                                     m_configManager->getValue(SettingPostSharpness) / 100.0f,
-                                     eye
-                );
-            } else {
-                m_device->setShader(m_shaderJustSample, SamplerType::LinearClamp);
-                m_device->setShaderInput(0, m_cbParams);
-                m_device->setShaderInput(0, textures[0]);
-                m_device->setShaderOutput(0, textures[1]);
-                m_device->dispatchShader();
-            }
-
-            // CA Pass
-            if (caPassEnabled) {
-                //Log("Executing Chromatic Aberration Correction pass.");
-                m_device->setShader(m_shaderCA, SamplerType::LinearClamp);
-                m_device->setShaderInput(0, m_cbParams);
-                m_device->setShaderInput(0, textures[1]);
-                m_device->setShaderOutput(0, output);
-                m_device->dispatchShader();
-            } else {
-                m_device->setShader(m_shaderJustSample, SamplerType::LinearClamp);
-                m_device->setShaderInput(0, m_cbParams);
-                m_device->setShaderInput(0, textures[1]);
-                m_device->setShaderOutput(0, output);
-                m_device->dispatchShader();
-            }
+            // Copy the final output to the destination texture
+            currentInput->copyTo(output);
         }
 
       private:
+        std::shared_ptr<ITexture> createIntermediateTexture(XrSwapchainCreateInfo createInfo) {
+            createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+
+            // if I don't do this apps other than StereoKit crash
+            if (m_device->isTextureFormatSRGB(createInfo.format)) {
+                // Good balance between visuals and performance.
+                createInfo.format = m_device->getTextureFormat(graphics::TextureFormat::R10G10B10A2_UNORM);
+            }
+
+            return m_device->createTexture(createInfo, "PostProcessor Intermediate Texture");
+        }
+
+        void addPass(ProcessingFunction function, bool enabled = true) {
+            m_passSettings.push_back({enabled, function});
+        }
+
+        /*void removePass(size_t index) {
+            if (index < m_passSettings.size()) {
+                m_passSettings.erase(m_passSettings.begin() + index);
+            }
+        }*/
+
         void createRenderResources() {
             const auto shadersDir = dllHome / "shaders";
             const auto shaderFile = shadersDir / "postprocess.hlsl";
 
             utilities::shader::Defines defines;
-            // defines.add("POST_PROCESS_SRC_SRGB", true);
-            // defines.add("POST_PROCESS_DST_SRGB", true);
-
-             m_shaderJustSample = m_device->createQuadShader(shaderFile, "mainJustSample", "JustSample", defines.get());
-
-            if (!m_shaderPP) {
-                Log("Failed to load Postprocess PS shader.");
-            }
+            m_passSettings.clear();
 
             if (m_mode == PostProcessType::On) {
                 m_shaderPP =
                     m_device->createQuadShader(shaderFile, "mainPostProcess", "Postprocess PS", defines.get());
 
-                if (!m_shaderPP) {
-                    Log("Failed to load Postprocess PS shader.");
-                }
             } else {
                 defines.add("PASS_THROUGH_USE_GAINS", true);
 
                 m_shaderPP =
                     m_device->createQuadShader(shaderFile, "mainPassThrough", "Passthrough PS", defines.get());
 
-                if (!m_shaderPP) {
-                    Log("Failed to load Passthrough PS shader.");
-                }
             }
+
+            // we add the processing pass anyways as even if it's "Off" we need it for gains
+            addPass([this](const std::shared_ptr<ITexture>& input,
+                           std::shared_ptr<ITexture>& output,
+                           std::optional<utilities::Eye> eye) {
+                m_device->setShader(m_shaderPP, SamplerType::LinearClamp);
+                m_device->setShaderInput(0, m_cbParams);
+                m_device->setShaderInput(0, input);
+                m_device->setShaderOutput(0, output);
+                m_device->dispatchShader();
+            });
             
+
             if (m_caCorrectionType == PostProcessCACorrectionType::VarjoGeneric) {
                 m_shaderCA = 
                     m_device->createQuadShader(shaderFile, "mainCACorrectionVarjoGeneric", "CACorrection PS", defines.get());
 
-                if (!m_shaderCA) {
-                    Log("Failed to load Chromatic Aberration Correction shader.");
-                }
+                addPass([this](const std::shared_ptr<ITexture>& input,
+                               std::shared_ptr<ITexture>& output,
+                               std::optional<utilities::Eye> eye) {
+                    m_device->setShader(m_shaderCA, SamplerType::LinearClamp);
+                    m_device->setShaderInput(0, m_cbParams);
+                    m_device->setShaderInput(0, input);
+                    m_device->setShaderOutput(0, output);
+                    m_device->dispatchShader();
+                });
             }
 
             if (m_sharpenerType == PostProcessSharpenerType::CAS) {
                 m_sharpener = graphics::CreateCASSharpener(m_configManager, m_device);
 
-                if (!m_sharpener) {
-                    Log("Failed to load CAS Sharpener.");
-                }
+                // Sharpening pass
+                addPass([this](const std::shared_ptr<ITexture>& input,
+                                std::shared_ptr<ITexture>& output,
+                                std::optional<utilities::Eye> eye) {
+
+                    SharpenerState sharpenerState;
+
+                    m_sharpener->process(input,
+                                            output,
+                                            sharpenerState.textures,
+                                            sharpenerState.blob,
+                                            m_configManager->getValue(SettingPostSharpness) / 100.0f,
+                                            eye);
+                });
             }
 
+            // for some reason I need this pass 
+            // for anything other than StereoKit apps to not get a black image
+            m_shaderJustSample = m_device->createQuadShader(shaderFile, "mainJustSample", "JustSample", defines.get());
+            addPass([this](const std::shared_ptr<ITexture>& input,
+                           std::shared_ptr<ITexture>& output,
+                           std::optional<utilities::Eye> eye) {
+                m_device->setShader(m_shaderJustSample, SamplerType::LinearClamp);
+                m_device->setShaderInput(0, m_cbParams);
+                m_device->setShaderInput(0, input);
+                m_device->setShaderOutput(0, output);
+                m_device->dispatchShader();
+            });
 
             // TODO: For now, we're going to require that all image processing shaders share the same configuration
             // structure.
@@ -345,6 +342,8 @@ namespace {
         std::shared_ptr<IQuadShader> m_shaderCA;
         std::shared_ptr<IQuadShader> m_shaderJustSample;
         std::shared_ptr<graphics::ISharpener> m_sharpener;
+
+        std::vector<PassSettings> m_passSettings;
 
         std::shared_ptr<IShaderBuffer> m_cbParams;
 
