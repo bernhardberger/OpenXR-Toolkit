@@ -242,6 +242,7 @@ $(SolutionDir)\patches\sed.exe -i "s/VALUE \"ProductVersion\", \".*\"$/VALUE \"P
     <ClInclude Include="layer.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="texture_pool.h" />
     <ClInclude Include="utils\ScreenGrab11.h" />
     <ClInclude Include="utils\ScreenGrab12.h" />
   </ItemGroup>
@@ -266,6 +267,7 @@ $(SolutionDir)\patches\sed.exe -i "s/VALUE \"ProductVersion\", \".*\"$/VALUE \"P
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="imageprocess.cpp" />
+    <ClCompile Include="texture_pool.cpp" />
     <ClCompile Include="utilities.cpp" />
     <ClCompile Include="utils\ScreenGrab11.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

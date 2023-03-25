@@ -98,6 +98,9 @@
     <ClInclude Include="..\external\FidelityFX-CAS\ffx-cas\ffx_cas.h">
       <Filter>Shader Files\CAS</Filter>
     </ClInclude>
+    <ClInclude Include="texture_pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -161,6 +164,9 @@
       <Filter>Utils</Filter>
     </ClCompile>
     <ClCompile Include="cas.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="texture_pool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -28,6 +28,7 @@
 #include "interfaces.h"
 #include "layer.h"
 #include "log.h"
+#include "texture_pool.h"
 
 namespace {
 
@@ -35,6 +36,7 @@ namespace {
     using namespace toolkit::config;
     using namespace toolkit::graphics;
     using namespace toolkit::log;
+    using namespace toolkit::textures;
 
     struct alignas(16) ImageProcessorConfig {
         XrVector4f Params1; // Contrast, Brightness, Exposure, Saturation (-1..+1 params)
@@ -46,14 +48,14 @@ namespace {
 
     struct SharpenerState {
         std::array<uint8_t, 1024> blob;
-        std::vector<std::shared_ptr<graphics::ITexture>> textures;
+        std::vector<std::shared_ptr<graphics::ITexture>> textures{};
     };
 
     class ImageProcessor : public IImageProcessor {
     using ProcessingFunction = std::function<void(const std::shared_ptr<ITexture>&, std::shared_ptr<ITexture>&, std::optional<utilities::Eye> eye)>;
     
     struct PassSettings {
-        bool enabled;
+        bool enabled{true};
         ProcessingFunction function;
     };
 
@@ -94,6 +96,10 @@ namespace {
                      std::vector<std::shared_ptr<ITexture>>& textures,
                      std::array<uint8_t, 1024>& blob,
                      std::optional<utilities::Eye> eye = std::nullopt) override {
+
+
+            TexturePool& texturePool = TexturePool::getInstance(m_device);
+
             // We need to use a per-instance blob.
             static_assert(sizeof(ImageProcessorConfig) <= 1024);
             ImageProcessorConfig* const config = reinterpret_cast<ImageProcessorConfig*>(blob.data());
@@ -106,18 +112,32 @@ namespace {
             // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
             m_cbParams->uploadData(config, sizeof(*config));
 
-            std::shared_ptr<ITexture> currentInput = input;
+            const std::shared_ptr<ITexture> currentInput = input;
             std::shared_ptr<ITexture> currentOutput;
 
             for (size_t i = 0; i < m_passSettings.size(); ++i) {
                 if (m_passSettings[i].enabled) {
                     // Create the output texture only if the pass is enabled
-                    auto currentOutput = createIntermediateTexture(output->getInfo());
+
+                    Log("\nPass %s", std::to_string(i).c_str());
+
+                    auto createInfo = output->getInfo();
+                    createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+
+                    // if I don't do this apps other than StereoKit crash
+                    if (m_device->isTextureFormatSRGB(createInfo.format)) {
+                        // Good balance between visuals and performance.
+                        createInfo.format = m_device->getTextureFormat(graphics::TextureFormat::R10G10B10A2_UNORM);
+                    }
+
+                    currentOutput = texturePool.acquire(createInfo, "ImageProcess Intermediate Texture");
                     // Execute the pass
                     m_passSettings[i].function(currentInput,  currentOutput, eye); 
 
                     // Set the output of the current pass as the input for the next pass
-                    currentInput = currentOutput;
+                    currentOutput->copyTo(currentInput);
+                    // currentInput = currentOutput;
+                    texturePool.release(currentOutput);
                 }
             }
 
@@ -126,18 +146,6 @@ namespace {
         }
 
       private:
-        std::shared_ptr<ITexture> createIntermediateTexture(XrSwapchainCreateInfo createInfo) {
-            createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-
-            // if I don't do this apps other than StereoKit crash
-            if (m_device->isTextureFormatSRGB(createInfo.format)) {
-                // Good balance between visuals and performance.
-                createInfo.format = m_device->getTextureFormat(graphics::TextureFormat::R10G10B10A2_UNORM);
-            }
-
-            return m_device->createTexture(createInfo, "PostProcessor Intermediate Texture");
-        }
-
         void addPass(ProcessingFunction function, bool enabled = true) {
             m_passSettings.push_back({enabled, function});
         }
@@ -200,7 +208,7 @@ namespace {
                 // Sharpening pass
                 addPass([this](const std::shared_ptr<ITexture>& input,
                                 std::shared_ptr<ITexture>& output,
-                                std::optional<utilities::Eye> eye) {
+                                const std::optional<utilities::Eye> eye) {
 
                     SharpenerState sharpenerState;
 
