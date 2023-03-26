@@ -1590,6 +1590,29 @@ namespace {
             m_menuEntries.back().acceleration = 5;
             postProcessGroup.finalize();
 
+            m_menuEntries.push_back({MenuIndent::OptionIndent,
+                                     "Sharpening",
+                                     MenuEntryType::Choice,
+                                     SettingPostSharpenerType,
+                                     0,
+                                     MenuEntry::LastVal<PostProcessSharpenerType>(),
+                                     MenuEntry::FmtEnum<PostProcessSharpenerType>});
+
+            MenuGroup postSharpenerGroup(this, [&] {
+                return m_configManager->peekEnumValue<PostProcessSharpenerType>(SettingPostSharpenerType) !=
+                       PostProcessSharpenerType::Off;
+            });
+
+            m_menuEntries.push_back({MenuIndent::SubGroupIndent,
+                                     "Sharpness",
+                                     MenuEntryType::Slider,
+                                     SettingPostSharpness,
+                                     0,
+                                     100,
+                                     MenuEntry::FmtPercent});
+
+            postSharpenerGroup.finalize();
+
             if (menuInfo.isCACorrectionNeed) {
                 m_menuEntries.push_back({MenuIndent::OptionIndent,
                                          "CA Correction",

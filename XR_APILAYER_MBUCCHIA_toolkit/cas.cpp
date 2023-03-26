@@ -22,6 +22,8 @@
 
 #include "pch.h"
 
+#include "cas.h"
+
 #include "shader_utilities.h"
 #include "factories.h"
 #include "interfaces.h"
@@ -32,109 +34,94 @@
 #include <ffx_a.h>
 #include <ffx_cas.h>
 
-namespace {
-
+namespace toolkit::graphics {
     using namespace toolkit;
     using namespace toolkit::config;
     using namespace toolkit::graphics;
     using namespace toolkit::log;
 
-    struct CASConstants {
-        uint32_t Const0[4];
-        uint32_t Const1[4];
-    };
+    CASUpscaler::CASUpscaler(std::shared_ptr<IConfigManager> configManager,
+                             std::shared_ptr<IDevice> graphicsDevice,
+                             int settingScaling,
+                             int settingAnamorphic)
+        : m_configManager(configManager), m_device(graphicsDevice),
+          m_isSharpenOnly(settingScaling == 100 && settingAnamorphic <= 0) {
+        initializeUpscaler();
+    }
 
-    class CASUpscaler : public IImageProcessor {
-      public:
-        CASUpscaler(std::shared_ptr<IConfigManager> configManager,
-                    std::shared_ptr<IDevice> graphicsDevice,
-                    int settingScaling,
-                    int settingAnamorphic)
-            : m_configManager(configManager), m_device(graphicsDevice),
-              m_isSharpenOnly(settingScaling == 100 && settingAnamorphic <= 0) {
-            initializeUpscaler();
-        }
+    void CASUpscaler::reload() {
+        initializeUpscaler();
+    }
 
-        void reload() override {
-            initializeUpscaler();
-        }
+    float CASUpscaler::getSharpnessSetting() const {
+        return m_configManager->getValue(SettingSharpness) / 100.f;
+    }
 
-        void update() override {
-        }
+    void CASUpscaler::update() {}
 
-        void process(std::shared_ptr<ITexture> input,
-                     std::shared_ptr<ITexture> output,
-                     std::vector<std::shared_ptr<ITexture>>& textures,
-                     std::array<uint8_t, 1024>& blob,
-                     std::optional<utilities::Eye> eye = std::nullopt) override {
-            // We need to use a per-instance blob.
-            static_assert(sizeof(CASConstants) <= 1024);
-            CASConstants* const config = reinterpret_cast<CASConstants*>(blob.data());
+    void CASUpscaler::process(std::shared_ptr<ITexture> input,
+                 std::shared_ptr<ITexture> output,
+                 std::vector<std::shared_ptr<ITexture>>& textures,
+                 std::array<uint8_t, 1024>& blob,
+                 std::optional<utilities::Eye> eye) {
+        // We need to use a per-instance blob.
+        static_assert(sizeof(CASConstants) <= 1024);
+        CASConstants* const config = reinterpret_cast<CASConstants*>(blob.data());
 
-            // Update the scaler's configuration specifically for this image.
-            const auto inputWidth = input->getInfo().width;
-            const auto inputHeight = input->getInfo().height;
-            const auto outputWidth = output->getInfo().width;
-            const auto outputHeight = output->getInfo().height;
-            const float sharpness = m_configManager->getValue(SettingSharpness) / 100.f;
+        // Update the scaler's configuration specifically for this image.
+        const auto inputWidth = input->getInfo().width;
+        const auto inputHeight = input->getInfo().height;
+        const auto outputWidth = output->getInfo().width;
+        const auto outputHeight = output->getInfo().height;
 
-            CasSetup(config->Const0,
-                     config->Const1,
-                     AClampF1(sharpness, 0, 1),
-                     static_cast<AF1>(inputWidth),
-                     static_cast<AF1>(inputHeight),
-                     static_cast<AF1>(outputWidth),
-                     static_cast<AF1>(outputHeight));
+        const float sharpness = getSharpnessSetting();
 
-            // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
-            m_configBuffer->uploadData(config, sizeof(*config));
+        CasSetup(config->Const0,
+                 config->Const1,
+                 AClampF1(sharpness, 0, 1),
+                 static_cast<AF1>(inputWidth),
+                 static_cast<AF1>(inputHeight),
+                 static_cast<AF1>(outputWidth),
+                 static_cast<AF1>(outputHeight));
 
-            // This value is the image region dimension that each thread group of the CAS shader operates on
-            const auto threadGroupWorkRegionDim = 16u;
-            const std::array<unsigned int, 3> threadGroups = {
-                (outputWidth + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim,  // dispatchX
-                (outputHeight + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim, // dispatchY
-                1};
+        // TODO: We can use an IShaderBuffer cache per swapchain and avoid this every frame.
+        m_configBuffer->uploadData(config, sizeof(*config));
 
-            m_shaderCAS->updateThreadGroups(threadGroups);
-            m_device->setShader(m_shaderCAS, SamplerType::LinearClamp);
-            m_device->setShaderInput(0, m_configBuffer);
-            m_device->setShaderInput(0, input);
-            m_device->setShaderOutput(0, output);
-            m_device->dispatchShader();
-        }
+        // This value is the image region dimension that each thread group of the CAS shader operates on
+        const auto threadGroupWorkRegionDim = 16u;
+        const std::array<unsigned int, 3> threadGroups = {
+            (outputWidth + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim,  // dispatchX
+            (outputHeight + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim, // dispatchY
+            1};
 
-      private:
-        void initializeUpscaler() {
-            const auto shadersDir = dllHome / "shaders";
-            const auto shaderFile = shadersDir / "CAS.hlsl";
+        m_shaderCAS->updateThreadGroups(threadGroups);
+        m_device->setShader(m_shaderCAS, SamplerType::LinearClamp);
+        m_device->setShaderInput(0, m_configBuffer);
+        m_device->setShaderInput(0, input);
+        m_device->setShaderOutput(0, output);
+        m_device->dispatchShader();
+    }
 
-            utilities::shader::Defines defines;
-            defines.add("CAS_THREAD_GROUP_SIZE", 64);
-            defines.add("CAS_SAMPLE_FP16", 0);
-            defines.add("CAS_SAMPLE_SHARPEN_ONLY", m_isSharpenOnly ? 1 : 0);
-            m_shaderCAS = m_device->createComputeShader(shaderFile, "mainCS", "CAS CS", {}, defines.get());
+    void CASUpscaler::initializeUpscaler() {
+        const auto shadersDir = dllHome / "shaders";
+        const auto shaderFile = shadersDir / "CAS.hlsl";
 
-            m_configBuffer = m_device->createBuffer(sizeof(CASConstants), "CAS Constants CB");
-        }
+        utilities::shader::Defines defines;
+        defines.add("CAS_THREAD_GROUP_SIZE", 64);
+        defines.add("CAS_SAMPLE_FP16", 0);
+        defines.add("CAS_SAMPLE_SHARPEN_ONLY", m_isSharpenOnly ? 1 : 0);
+        m_shaderCAS = m_device->createComputeShader(shaderFile, "mainCS", "CAS CS", {}, defines.get());
 
-        const std::shared_ptr<IConfigManager> m_configManager;
-        const std::shared_ptr<IDevice> m_device;
-        const bool m_isSharpenOnly;
-
-        std::shared_ptr<IComputeShader> m_shaderCAS;
-        std::shared_ptr<IShaderBuffer> m_configBuffer;
-    };
+        m_configBuffer = m_device->createBuffer(sizeof(CASConstants), "CAS Constants CB");
+    }
 
 } // namespace
 
 namespace toolkit::graphics {
-
     std::shared_ptr<IImageProcessor> CreateCASUpscaler(std::shared_ptr<IConfigManager> configManager,
                                                        std::shared_ptr<IDevice> graphicsDevice,
                                                        int settingScaling,
                                                        int settingAnamorphic) {
         return std::make_shared<CASUpscaler>(configManager, graphicsDevice, settingScaling, settingAnamorphic);
     }
-
 } // namespace toolkit::graphics

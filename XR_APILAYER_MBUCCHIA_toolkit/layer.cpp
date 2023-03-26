@@ -165,6 +165,9 @@ namespace {
             m_configManager->setDefault(config::SettingPostChromaticCorrectionR, 100090);
             m_configManager->setDefault(config::SettingPostChromaticCorrectionB, 99880);
 
+            m_configManager->setEnumDefault(config::SettingPostSharpenerType, config::PostProcessSharpenerType::Off);
+            m_configManager->setDefault(config::SettingPostSharpness, 100);
+
             // TODO: Appearance (User)
 #if 0
             m_configManager->setDefault(config::SettingPostContrast + "_u1", 500);
@@ -752,8 +755,11 @@ namespace {
                     }
 
                     // the default post processing pass that's always run
+                    m_postProcessors.push_back(graphics::CreateImageProcessor(m_configManager, m_graphicsDevice));
+
                     m_postProcessors.push_back(
-                        graphics::CreateImageProcessor(m_configManager, m_graphicsDevice));
+                        graphics::CreateCASSharpenerPostProcessor(m_configManager, m_graphicsDevice)
+                    );
 
                     // optional varjo ca correction pass when supported
                     if (m_configManager->isDeveloper() || m_systemName == "AERO" ||
@@ -2911,30 +2917,40 @@ namespace {
                             timer->start();
 
                             std::shared_ptr<graphics::ITexture> nextOutput = finalOutput;
-                            
+                            std::vector<std::shared_ptr<graphics::IImageProcessor>> enabledPostProcessors;
+
                             for (auto& postProcessor : m_postProcessors) {
                                 if (postProcessor->isEnabled()) {
-                                    postProcessor->process(nextInput,
-                                                                     nextOutput,
-                                                                     swapchainState.postProcessorTextures,
-                                                                     swapchainState.postProcessorBlob,
-                                                                     (utilities::Eye)eye);
-                                    nextOutput->copyTo(nextInput);
+                                    enabledPostProcessors.push_back(postProcessor);
                                 }
                             }
-                            
-                            finalOutput = nextInput;
+
+                            for (size_t i = 0; i < enabledPostProcessors.size(); i++) {
+                                auto& postProcessor = enabledPostProcessors[i];
+                                const bool isLast = (i == enabledPostProcessors.size() - 1);
+                                postProcessor->process(nextInput,
+                                                       nextOutput,
+                                                       swapchainState.postProcessorTextures,
+                                                       swapchainState.postProcessorBlob,
+                                                       (utilities::Eye)eye);
+
+                                // if (!isLast) {
+                                    nextOutput->copyTo(nextInput);
+                                // }
+                            }
+
+                            nextInput->copyTo(finalOutput);
 
                             timer->stop();
                         }
 
                         // Copy the output back into the VPRT runtime swapchain is needed.
-                        if (finalOutput != swapchainImages.runtimeTexture) {
+                        // if (finalOutput != swapchainImages.runtimeTexture) {
                             finalOutput->copyTo(swapchainImages.runtimeTexture,
                                                 correctedProjectionViews[eye].subImage.imageRect.offset.x,
                                                 correctedProjectionViews[eye].subImage.imageRect.offset.y,
                                                 view.subImage.imageArrayIndex);
-                        }
+                        // }
 
                         // Patch the resolution.
                         correctedProjectionViews[eye].subImage.imageRect.extent.width = scaledOutputWidth;

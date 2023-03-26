@@ -39,6 +39,9 @@
     <Filter Include="Shader Files\CAS">
       <UniqueIdentifier>{18b9944b-429a-4b5e-8df2-d9de6d96564f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\PostProcess">
+      <UniqueIdentifier>{f83dbf86-66b2-4ffe-ac3c-2ea5b3076471}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -98,6 +101,9 @@
     <ClInclude Include="..\external\FidelityFX-CAS\ffx-cas\ffx_cas.h">
       <Filter>Shader Files\CAS</Filter>
     </ClInclude>
+    <ClInclude Include="cas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -128,9 +134,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="nis.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imageprocess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="utilities.cpp">
@@ -164,7 +167,13 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="chromatic_aberration.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="imageprocess.cpp">
+      <Filter>Source Files\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="cas_post_sharpen.cpp">
+      <Filter>Source Files\PostProcess</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

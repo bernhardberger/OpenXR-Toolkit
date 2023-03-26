@@ -99,6 +99,10 @@ namespace toolkit {
         std::shared_ptr<IPostProcessor> CreateChromaticAberrationPostProcessor(
             std::shared_ptr<toolkit::config::IConfigManager> configManager, std::shared_ptr<IDevice> graphicsDevice);
 
+        std::shared_ptr<IPostProcessor> CreateCASSharpenerPostProcessor(
+            std::shared_ptr<toolkit::config::IConfigManager> configManager, std::shared_ptr<IDevice> graphicsDevice);
+
+
         std::shared_ptr<IFrameAnalyzer>
         CreateFrameAnalyzer(std::shared_ptr<toolkit::config::IConfigManager> configManager,
                             std::shared_ptr<IDevice> graphicsDevice,

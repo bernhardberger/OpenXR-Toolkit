@@ -235,6 +235,7 @@ $(SolutionDir)\patches\sed.exe -i "s/VALUE \"ProductVersion\", \".*\"$/VALUE \"P
     </ClInclude>
     <ClInclude Include="d3dcommon.h" />
     <ClInclude Include="detours_helpers.h" />
+    <ClInclude Include="cas.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="shader_utilities.h" />
     <ClInclude Include="factories.h" />
@@ -269,6 +270,7 @@ $(SolutionDir)\patches\sed.exe -i "s/VALUE \"ProductVersion\", \".*\"$/VALUE \"P
     </ClCompile>
     <ClCompile Include="imageprocess.cpp" />
     <ClCompile Include="chromatic_aberration.cpp" />
+    <ClCompile Include="cas_post_sharpen.cpp" />
     <ClCompile Include="utilities.cpp" />
     <ClCompile Include="utils\ScreenGrab11.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -323,7 +325,7 @@ $(SolutionDir)\patches\sed.exe -i "s/VALUE \"ProductVersion\", \".*\"$/VALUE \"P
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-	  <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </DeploymentContent>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </DeploymentContent>

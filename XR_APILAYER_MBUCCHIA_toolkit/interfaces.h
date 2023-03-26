@@ -183,6 +183,8 @@ namespace toolkit {
         const std::string SettingPostChromaticCorrection = "post_ca";
         const std::string SettingPostChromaticCorrectionR = "post_ca_r";
         const std::string SettingPostChromaticCorrectionB = "post_ca_b";
+        const std::string SettingPostSharpenerType = "post_sharpener_type";
+        const std::string SettingPostSharpness = "post_sharpener_sharpness";
         const std::string SettingEyeTrackingEnabled = "eye_tracking";
         const std::string SettingEyeProjectionDistance = "eye_projection";
         const std::string SettingEyeDebug = "eye_debug";
@@ -214,6 +216,7 @@ namespace toolkit {
         enum class VariableShadingRateDir { Vertical, Horizontal, MaxValue };
         enum class VariableShadingRateVal { R_x1, R_2x1, R_2x2, R_4x2, R_4x4, R_Cull, MaxValue };
         enum class PostProcessType { Off = 0, On, MaxValue };
+        enum class PostProcessSharpenerType { Off = 0, CAS, MaxValue };
         enum class PostProcessCACorrectionType { Off = 0, VarjoGeneric, MaxValue };
         enum class PostSunGlassesType { None = 0, Light, Dark, Night, MaxValue };
         enum class FovModeType { Simple, Advanced, MaxValue };
